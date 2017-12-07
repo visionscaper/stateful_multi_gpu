@@ -1,5 +1,5 @@
 # stateful_multi_gpu
-Experimental utility to build stateful RNN models for multi GPU training.
+Experimental utility in development to build stateful RNN models for multi GPU training.
 
 ## How to use stateful_multi_gpu()
 See `example.py` for a toy example of how the utility function can be used.
