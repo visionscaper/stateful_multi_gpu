@@ -1,5 +1,17 @@
 """
 Trains a multi GPU version of a stateful Keras model and a single GPU version
+
+To make stateful models in Keras you need to provide the batch size you are using.
+`stateful_multi_gpu()` ensures that the right batch size is used throughout the model.
+
+To use `stateful_multi_gpu()` you need to create a `inputs_generator` method that can make
+inputs for your model, for any batch size, and a `model_generator` method that can make
+your model for any batch size.
+
+`stateful_multi_gpu` uses these generator methods to create model inputs that expect batch size `batch_size` and
+model replica's (one per GPU) that expect batch size `batch_size` // `num_gpus`.
+
+It is important batch_size is wholly dividable by num_gpus.
 """
 import time
 
@@ -13,7 +25,7 @@ from keras.layers.wrappers import TimeDistributed
 from keras.layers.core import Dense
 from keras.models import Model
 
-# The original multi_gpu_model util of Keras
+# The original multi_gpu_model util of Keras (it doesn't work for stateful models)
 #from keras.utils.training_utils import multi_gpu_model
 
 import numpy as np
@@ -34,6 +46,7 @@ stateful_model = True
 batch_training_steps = 50
 reset_period = 2  # reset model every two training steps
 
+# Allow our models to be placed on GPUs next to other models
 config = tf.ConfigProto(allow_soft_placement=True, gpu_options=tf.GPUOptions(allow_growth=True))
 sess = tf.Session(config=config)
 K.set_session(sess)
