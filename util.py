@@ -49,7 +49,7 @@ def _normalize_device_name(name):
     return name
 
 
-def stateful_multi_gpu(inputs_generator, model_generator, batch_size, gpus):
+def stateful_multi_gpu(inputs_generator, processor_generator, batch_size, gpus):
     """
     TODO
 
@@ -82,21 +82,19 @@ def stateful_multi_gpu(inputs_generator, model_generator, batch_size, gpus):
                                           target_devices,
                                           available_devices))
 
-    sub_batch_size = batch_size // gpus
+    with tf.device('/cpu:0'):
+        full_batch_inputs = inputs_generator(batch_size)
+        if not isinstance(full_batch_inputs, list):
+            full_batch_inputs = [full_batch_inputs]
 
-    full_batch_inputs = inputs_generator(batch_size)
-    if not isinstance(full_batch_inputs, list):
-        full_batch_inputs = [full_batch_inputs]
+        processor = processor_generator()
 
-    model = model_generator(sub_batch_size)
+    all_outputs = None
 
-    all_outputs = []
-    for i in range(len(model.outputs)):
-        all_outputs.append([])
-
-    # Place a copy of the model on each GPU,
+    # Place a copy of the embedded_model on each GPU,
     # each getting a slice of the inputs.
     for i in range(gpus):
+
         with tf.device('/gpu:%d' % i):
             with tf.name_scope('replica_%d' % i):
 
@@ -106,11 +104,16 @@ def stateful_multi_gpu(inputs_generator, model_generator, batch_size, gpus):
                     slice_i = SliceBatch(batch_size, gpus, i)(inp)
                     inputs.append(slice_i)
 
-                # Apply model on slice
+                # Apply embedded_model on slice
                 # (creating a model replica on the target device).
-                outputs = model(inputs)
+                outputs = processor(inputs)
                 if not isinstance(outputs, list):
                     outputs = [outputs]
+
+                if all_outputs is None:
+                    all_outputs = []
+                    for i in range(len(outputs)):
+                        all_outputs.append([])
 
                 # Save the outputs for merging back together later.
                 for o in range(len(outputs)):
